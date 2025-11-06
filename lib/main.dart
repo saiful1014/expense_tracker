@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/offline_sync_service.dart';
 
 void main() async {
@@ -36,7 +36,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }
