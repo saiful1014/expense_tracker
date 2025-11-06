@@ -36,6 +36,24 @@ class Expense {
       synced: (map['synced'] as int? ?? 0) == 1,
     );
   }
+
+  Expense copyWith({
+    int? id,
+    String? description,
+    double? amount,
+    DateTime? date,
+    String? category,
+    bool? synced,
+  }) {
+    return Expense(
+      id: id ?? this.id,
+      description: description ?? this.description,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      category: category ?? this.category,
+      synced: synced ?? this.synced,
+    );
+  }
 }
 
 

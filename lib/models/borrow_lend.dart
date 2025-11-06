@@ -44,5 +44,27 @@ class BorrowLend {
       synced: (map['synced'] as int? ?? 0) == 1,
     );
   }
+
+  BorrowLend copyWith({
+    int? id,
+    String? personName,
+    double? amount,
+    DateTime? date,
+    String? type,
+    String? description,
+    bool? completed,
+    bool? synced,
+  }) {
+    return BorrowLend(
+      id: id ?? this.id,
+      personName: personName ?? this.personName,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      type: type ?? this.type,
+      description: description ?? this.description,
+      completed: completed ?? this.completed,
+      synced: synced ?? this.synced,
+    );
+  }
 }
 
