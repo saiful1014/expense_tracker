@@ -17,6 +17,7 @@ import '../presentation/dialogs/no_internet_dialog.dart';
 import '../presentation/dialogs/not_signed_in_dialog.dart';
 import '../services/connectivity_service.dart';
 import 'add_borrow_lend_screen.dart';
+import '../models/borrow_lend.dart';
 
 class BorrowLendScreen extends StatefulWidget {
   const BorrowLendScreen({super.key});
@@ -174,6 +175,18 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
     }
   }
 
+  Future<void> _navigateToEditBorrowLend(BorrowLend transaction) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddBorrowLendScreen(transaction: transaction),
+      ),
+    );
+    if (result == true && mounted) {
+      _controller.loadBorrowLend();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
@@ -242,6 +255,7 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                                   transaction: transaction,
                                   isBorrowed: true,
                                   onMarkCompleted: () => _handleMarkCompleted(transaction.id!),
+                                  onEdit: () => _navigateToEditBorrowLend(transaction),
                                   onDelete: () => _handleDelete(transaction.id!),
                                   formatDate: BorrowLendUtils.formatDate,
                                 );
@@ -262,6 +276,7 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                                   transaction: transaction,
                                   isBorrowed: false,
                                   onMarkCompleted: () => _handleMarkCompleted(transaction.id!),
+                                  onEdit: () => _navigateToEditBorrowLend(transaction),
                                   onDelete: () => _handleDelete(transaction.id!),
                                   formatDate: BorrowLendUtils.formatDate,
                                 );
@@ -283,6 +298,7 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                                   isBorrowed: transaction.type == 'borrow',
                                   isCompleted: true,
                                   onMarkPending: () => _handleMarkPending(transaction.id!),
+                                  onEdit: () => _navigateToEditBorrowLend(transaction),
                                   onDelete: () => _handleDelete(transaction.id!),
                                   formatDate: BorrowLendUtils.formatDate,
                                 );

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../data/repositories/expense_repository_impl.dart';
 import '../domain/usecases/add_expense.dart';
+import '../domain/usecases/update_expense.dart';
 import '../presentation/widgets/expense_form_fields.dart';
 import '../models/expense.dart';
 import '../services/cloud_sync_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
-  const AddExpenseScreen({super.key});
+  final Expense? expense;
+
+  const AddExpenseScreen({super.key, this.expense});
 
   @override
   State<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -20,20 +23,41 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     ExpenseRepositoryImpl(),
     CloudSyncService(),
   );
+  final _updateExpense = UpdateExpense(
+    ExpenseRepositoryImpl(),
+    CloudSyncService(),
+  );
   
   String _selectedCategory = 'Food';
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
+  late final bool _isEditing;
 
   final List<String> _categories = [
-    'Food',
-    'Transport',
-    'Shopping',
-    'Bills',
-    'Entertainment',
-    'Health',
-    'Other',
+    'Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Health', 'Other'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _isEditing = widget.expense != null;
+
+    if (_isEditing) {
+      final expense = widget.expense!;
+      _descriptionController.text = expense.description;
+      _amountController.text = expense.amount.toStringAsFixed(2);
+      _selectedCategory = expense.category;
+      _selectedDate = DateTime(
+        expense.date.year,
+        expense.date.month,
+        expense.date.day,
+      );
+      _selectedTime = TimeOfDay(
+        hour: expense.date.hour,
+        minute: expense.date.minute,
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -82,6 +106,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
 
     final expense = Expense(
+      id: widget.expense?.id,
       description: _descriptionController.text.trim(),
       amount: double.parse(_amountController.text),
       date: dateTime,
@@ -89,16 +114,28 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
 
     try {
-      await _addExpense.call(expense);
-      final isSignedIn = await _addExpense.cloudSync.isSignedIn();
+      if (_isEditing) {
+        await _updateExpense.call(expense);
+      } else {
+        await _addExpense.call(expense);
+      }
+      final isSignedIn = _isEditing
+          ? await _updateExpense.cloudSync.isSignedIn()
+          : await _addExpense.cloudSync.isSignedIn();
       
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isSignedIn
-                ? 'Expense added and synced to cloud!'
-                : 'Expense added successfully!'),
+            content: Text(
+              _isEditing
+                  ? (isSignedIn
+                      ? 'Expense updated and synced to cloud!'
+                      : 'Expense updated successfully!')
+                  : (isSignedIn
+                      ? 'Expense added and synced to cloud!'
+                      : 'Expense added successfully!'),
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -124,7 +161,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Expense'),
+        title: Text(_isEditing ? 'Edit Expense' : 'Add Expense'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
@@ -151,7 +188,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         onPressed: _saveExpense,
         backgroundColor: Colors.blue.shade700,
         icon: const Icon(Icons.save),
-        label: const Text('Save Expense'),
+        label: Text(_isEditing ? 'Update Expense' : 'Save Expense'),
       ),
     );
   }

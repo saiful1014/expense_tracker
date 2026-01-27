@@ -11,6 +11,7 @@ class TransactionCard extends StatelessWidget {
   final VoidCallback? onMarkCompleted;
   final VoidCallback? onMarkPending;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
   final String Function(DateTime) formatDate;
 
   const TransactionCard({
@@ -21,6 +22,7 @@ class TransactionCard extends StatelessWidget {
     this.onMarkCompleted,
     this.onMarkPending,
     required this.onDelete,
+    required this.onEdit,
     required this.formatDate,
   });
 
@@ -74,6 +76,7 @@ class TransactionCard extends StatelessWidget {
             onMarkCompleted: onMarkCompleted,
             onMarkPending: onMarkPending,
             onDelete: onDelete,
+            onEdit: onEdit,
           ),
         ),
       ),

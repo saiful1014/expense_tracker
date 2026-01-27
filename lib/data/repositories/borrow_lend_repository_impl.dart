@@ -45,6 +45,11 @@ class BorrowLendRepositoryImpl implements BorrowLendRepository {
   }
 
   @override
+  Future<void> updateBorrowLend(BorrowLend borrowLend) async {
+    await _dbHelper.updateBorrowLend(borrowLend);
+  }
+
+  @override
   Future<void> markAsCompleted(int id) async {
     await _dbHelper.markBorrowLendAsCompleted(id);
   }
@@ -61,17 +66,20 @@ class BorrowLendRepositoryImpl implements BorrowLendRepository {
 
     try {
       final cloudTransactions = await _cloudSync.getBorrowLendFromCloud();
+      final localTransactions = await _dbHelper.getAllBorrowLend();
+
       for (final transaction in cloudTransactions) {
-        final localBorrowed = await _dbHelper.getBorrowLendByType('borrow');
-        final localLent = await _dbHelper.getBorrowLendByType('lend');
-        final allLocal = [...localBorrowed, ...localLent];
-        final exists = allLocal.any((e) => e.id == transaction.id);
-        
+        final exists = localTransactions.any((local) => local.id == transaction.id);
+
         if (!exists) {
           final transactionId = await _dbHelper.insertBorrowLend(transaction);
           await _dbHelper.markBorrowLendAsSynced(transactionId);
+          localTransactions.add(transaction.copyWith(id: transactionId, synced: true));
         } else {
-          await _dbHelper.markBorrowLendAsSynced(transaction.id!);
+          final transactionId = transaction.id;
+          if (transactionId != null) {
+            await _dbHelper.markBorrowLendAsSynced(transactionId);
+          }
         }
       }
     } catch (e) {

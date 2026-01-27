@@ -67,6 +67,12 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  deferred-components:
+    - name: borrowLendComponent
+      libraries:
+        - package:test_new_things/screens/borrow_lend_screen.dart
+
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

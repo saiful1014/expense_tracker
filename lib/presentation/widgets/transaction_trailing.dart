@@ -8,6 +8,7 @@ class TransactionTrailing extends StatelessWidget {
   final VoidCallback? onMarkCompleted;
   final VoidCallback? onMarkPending;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   const TransactionTrailing({
     super.key,
@@ -17,6 +18,7 @@ class TransactionTrailing extends StatelessWidget {
     this.onMarkCompleted,
     this.onMarkPending,
     required this.onDelete,
+    required this.onEdit,
   });
 
   @override
@@ -53,6 +55,18 @@ class TransactionTrailing extends StatelessWidget {
                 ),
               ),
             if (!isCompleted && onMarkCompleted != null) const SizedBox(width: 4),
+            GestureDetector(
+              onTap: onEdit,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: Colors.blue.shade400,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
             GestureDetector(
               onTap: onDelete,
               child: Container(

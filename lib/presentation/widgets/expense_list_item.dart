@@ -4,6 +4,7 @@ import '../../models/expense.dart';
 class ExpenseListItem extends StatelessWidget {
   final Expense expense;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
   final Color Function(String) getCategoryColor;
   final IconData Function(String) getCategoryIcon;
   final String Function(DateTime) formatDate;
@@ -13,6 +14,7 @@ class ExpenseListItem extends StatelessWidget {
     super.key,
     required this.expense,
     required this.onDelete,
+    required this.onEdit,
     required this.getCategoryColor,
     required this.getCategoryIcon,
     required this.formatDate,
@@ -139,16 +141,33 @@ class ExpenseListItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: onDelete,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.delete_outline,
-                      size: 18,
-                      color: Colors.red.shade400,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: onEdit,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: Colors.blue.shade400,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.red.shade400,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

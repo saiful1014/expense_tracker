@@ -5,6 +5,7 @@ import '../domain/usecases/get_expenses.dart';
 import '../domain/usecases/delete_expense.dart';
 import '../presentation/controllers/expense_controller.dart';
 import '../services/connectivity_service.dart';
+import '../models/expense.dart';
 import '../presentation/widgets/expense_app_bar.dart';
 import '../presentation/widgets/expense_statistics_section.dart';
 import '../presentation/widgets/expense_list_item.dart';
@@ -14,7 +15,7 @@ import '../presentation/dialogs/delete_expense_dialog.dart';
 import '../presentation/dialogs/no_internet_dialog.dart';
 import '../presentation/dialogs/not_signed_in_dialog.dart';
 import 'add_expense_screen.dart';
-import 'borrow_lend_screen.dart';
+import 'deferred_borrow_lend.dart';
 import 'sync_setup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -129,6 +130,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _navigateToEditExpense(Expense expense) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AddExpenseScreen(expense: expense)),
+    );
+    if (result == true && mounted) {
+      _controller.loadExpenses();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
@@ -150,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onBorrowLend: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const BorrowLendScreen()),
+              MaterialPageRoute(builder: (context) => const DeferredBorrowLend()),
             );
           },
           onDateRange: _selectDateRange,
@@ -204,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               return ExpenseListItem(
                                 expense: expense,
                                 onDelete: () => _handleDelete(expense.id!),
+                                onEdit: () => _navigateToEditExpense(expense),
                                 getCategoryColor: ExpenseUtils.getCategoryColor,
                                 getCategoryIcon: ExpenseUtils.getCategoryIcon,
                                 formatDate: ExpenseUtils.formatDate,

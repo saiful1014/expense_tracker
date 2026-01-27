@@ -45,6 +45,11 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
   }
 
   @override
+  Future<void> updateExpense(Expense expense) async {
+    await _dbHelper.updateExpense(expense);
+  }
+
+  @override
   Future<void> deleteExpense(int id) async {
     await _dbHelper.deleteExpense(id);
   }

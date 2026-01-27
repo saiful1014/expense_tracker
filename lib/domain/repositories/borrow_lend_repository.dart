@@ -10,6 +10,7 @@ abstract class BorrowLendRepository {
   Future<void> deleteBorrowLend(int id);
   Future<void> markAsCompleted(int id);
   Future<void> markAsPending(int id);
+  Future<void> updateBorrowLend(BorrowLend borrowLend);
   Future<void> syncFromCloud();
   Future<void> deleteFromCloud(int id);
   Future<void> syncToCloud(BorrowLend borrowLend);

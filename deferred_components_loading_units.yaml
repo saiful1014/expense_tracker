@@ -1,0 +1,49 @@
+# ==============================================================================
+# The contents of this file are automatically generated and it is not
+# recommended to modify this file manually.
+# ==============================================================================
+#
+# In order to prevent unexpected splitting of deferred apps, this file records
+# the last generated set of loading units. It only possible to obtain the final
+# configuration of loading units after compilation is complete. This means
+# improperly setup deferred imports can only be detected after compilation.
+#
+# This file allows the build tool to detect any changes in the generated
+# loading units. During the next build attempt, loading units in this file are
+# compared against the newly generated loading units to check for any new or
+# removed loading units. In the case where loading units do not match, the build
+# will fail and ask the developer to verify that the `deferred-components`
+# configuration in `pubspec.yaml` is correct. Developers should make any
+# necessary changes to integrate new and changed loading units or remove no
+# longer existing loading units from the configuration. The build command should
+# then be re-run to continue the build process.
+#
+# Sometimes, changes to the generated loading units may be unintentional. If
+# the list of loading units in this file is not what is expected, the app's
+# deferred imports should be reviewed. Third party plugins and packages may
+# also introduce deferred imports that result in unexpected loading units.
+loading-units:
+  - id: 2
+    libraries:
+      - package:test_new_things/screens/borrow_lend_screen.dart
+      - package:test_new_things/data/repositories/borrow_lend_repository_impl.dart
+      - package:test_new_things/domain/usecases/get_borrow_lend.dart
+      - package:test_new_things/domain/usecases/delete_borrow_lend.dart
+      - package:test_new_things/domain/usecases/mark_transaction_completed.dart
+      - package:test_new_things/domain/usecases/mark_transaction_pending.dart
+      - package:test_new_things/presentation/controllers/borrow_lend_controller.dart
+      - package:test_new_things/presentation/widgets/borrow_lend_summary_cards.dart
+      - package:test_new_things/presentation/widgets/transaction_card.dart
+      - package:test_new_things/presentation/widgets/empty_transaction_list.dart
+      - package:test_new_things/presentation/utils/borrow_lend_utils.dart
+      - package:test_new_things/presentation/dialogs/delete_transaction_dialog.dart
+      - package:test_new_things/presentation/dialogs/mark_completed_dialog.dart
+      - package:test_new_things/presentation/dialogs/mark_pending_dialog.dart
+      - package:test_new_things/screens/add_borrow_lend_screen.dart
+      - package:test_new_things/domain/repositories/borrow_lend_repository.dart
+      - package:test_new_things/presentation/widgets/transaction_header.dart
+      - package:test_new_things/presentation/widgets/transaction_subtitle.dart
+      - package:test_new_things/presentation/widgets/transaction_trailing.dart
+      - package:test_new_things/domain/usecases/add_borrow_lend.dart
+      - package:test_new_things/domain/usecases/update_borrow_lend.dart
+      - package:test_new_things/presentation/widgets/borrow_lend_form_fields.dart

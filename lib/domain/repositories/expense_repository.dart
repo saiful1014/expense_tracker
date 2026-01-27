@@ -9,6 +9,7 @@ abstract class ExpenseRepository {
   Future<double> getTotalExpensesByDateRange(DateTime startDate, DateTime endDate);
   Future<int> insertExpense(Expense expense);
   Future<void> deleteExpense(int id);
+  Future<void> updateExpense(Expense expense);
   Future<void> syncFromCloud();
   Future<void> deleteFromCloud(int id);
   Future<void> syncToCloud(Expense expense);

@@ -94,6 +94,25 @@ class DatabaseHelper {
     return await db.insert('expenses', expense.toMap());
   }
 
+  Future<int> updateExpense(Expense expense) async {
+    final db = await database;
+    if (expense.id == null) {
+      throw ArgumentError('Expense ID must not be null for update');
+    }
+    return await db.update(
+      'expenses',
+      {
+        'description': expense.description,
+        'amount': expense.amount,
+        'date': expense.date.toIso8601String(),
+        'category': expense.category,
+        'synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [expense.id],
+    );
+  }
+
   Future<List<Expense>> getAllExpenses() async {
     final db = await database;
     final result = await db.query('expenses', orderBy: 'date DESC');
@@ -171,6 +190,27 @@ class DatabaseHelper {
     return await db.insert('borrow_lend', borrowLend.toMap());
   }
 
+  Future<int> updateBorrowLend(BorrowLend borrowLend) async {
+    final db = await database;
+    if (borrowLend.id == null) {
+      throw ArgumentError('Borrow/Lend ID must not be null for update');
+    }
+    return await db.update(
+      'borrow_lend',
+      {
+        'person_name': borrowLend.personName,
+        'amount': borrowLend.amount,
+        'date': borrowLend.date.toIso8601String(),
+        'type': borrowLend.type,
+        'description': borrowLend.description,
+        'completed': borrowLend.completed ? 1 : 0,
+        'synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [borrowLend.id],
+    );
+  }
+
   Future<List<BorrowLend>> getAllBorrowLend() async {
     final db = await database;
     final result = await db.query('borrow_lend', orderBy: 'date DESC');
@@ -202,7 +242,10 @@ class DatabaseHelper {
     final db = await database;
     return await db.update(
       'borrow_lend',
-      {'completed': 1},
+      {
+        'completed': 1,
+        'synced': 0,
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -212,7 +255,10 @@ class DatabaseHelper {
     final db = await database;
     return await db.update(
       'borrow_lend',
-      {'completed': 0},
+      {
+        'completed': 0,
+        'synced': 0,
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -230,7 +276,7 @@ class DatabaseHelper {
   Future<double> getTotalBorrowed() async {
     final db = await database;
     final result = await db.rawQuery(
-      "SELECT SUM(amount) as total FROM borrow_lend WHERE type = 'borrow'",
+      "SELECT SUM(amount) as total FROM borrow_lend WHERE type = 'borrow' AND completed = 0",
     );
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
@@ -238,7 +284,7 @@ class DatabaseHelper {
   Future<double> getTotalLent() async {
     final db = await database;
     final result = await db.rawQuery(
-      "SELECT SUM(amount) as total FROM borrow_lend WHERE type = 'lend'",
+      "SELECT SUM(amount) as total FROM borrow_lend WHERE type = 'lend' AND completed = 0",
     );
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
