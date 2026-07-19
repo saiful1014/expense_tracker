@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../data/repositories/expense_repository_impl.dart';
-import '../domain/usecases/get_expenses.dart';
-import '../domain/usecases/delete_expense.dart';
-import '../presentation/controllers/expense_controller.dart';
-import '../services/connectivity_service.dart';
-import '../models/expense.dart';
-import '../presentation/widgets/expense_app_bar.dart';
-import '../presentation/widgets/expense_statistics_section.dart';
-import '../presentation/widgets/expense_list_item.dart';
-import '../presentation/widgets/empty_expense_list.dart';
-import '../presentation/utils/expense_utils.dart';
-import '../presentation/dialogs/delete_expense_dialog.dart';
-import '../presentation/dialogs/no_internet_dialog.dart';
-import '../presentation/dialogs/not_signed_in_dialog.dart';
-import 'add_expense_screen.dart';
-import 'deferred_borrow_lend.dart';
-import 'sync_setup_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:test_new_things/ui/features/expenses/view_models/expense_view_model.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
+import 'package:test_new_things/domain/models/expense.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/expense_app_bar.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/expense_statistics_section.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/expense_list_item.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/empty_expense_list.dart';
+import 'package:test_new_things/ui/core/utils/expense_utils.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/delete_expense_dialog.dart';
+import 'package:test_new_things/ui/core/dialogs/no_internet_dialog.dart';
+import 'package:test_new_things/ui/core/dialogs/not_signed_in_dialog.dart';
+import 'package:test_new_things/data/services/database_helper.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/sync_status_bottom_sheet.dart';
+import 'package:test_new_things/ui/features/home/views/widgets/budget_card.dart';
+import 'package:test_new_things/ui/features/home/views/widgets/overdue_warning_banner.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/expense_details_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,20 +28,45 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late ExpenseController _controller;
+  late ExpenseViewModel _controller;
+  bool _initialized = false;
+  List<BorrowLend> _overdueTransactions = [];
 
   @override
-  void initState() {
-    super.initState();
-    final repository = ExpenseRepositoryImpl();
-    final getExpenses = GetExpenses(repository);
-    final deleteExpense = DeleteExpense(
-      repository: repository,
-      connectivity: ConnectivityService.instance,
-      cloudSync: repository.cloudSync,
-    );
-    _controller = ExpenseController(repository, getExpenses, deleteExpense);
-    _controller.loadExpenses();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _controller = context.read<ExpenseViewModel>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadData();
+      });
+      _initialized = true;
+    }
+  }
+
+  Future<void> _loadData() async {
+    await _controller.loadExpenses();
+    await _checkOverdueTransactions();
+  }
+
+  Future<void> _checkOverdueTransactions() async {
+    try {
+      final db = DatabaseHelper.instance;
+      final all = await db.getAllBorrowLend();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      if (mounted) {
+        setState(() {
+          _overdueTransactions = all.where((tx) {
+            if (tx.completed || tx.dueDate == null) return false;
+            final txDate = DateTime(tx.dueDate!.year, tx.dueDate!.month, tx.dueDate!.day);
+            return txDate.isBefore(today) || txDate.isAtSameMomentAs(today);
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking overdue: $e');
+    }
   }
 
   Future<void> _selectDateRange() async {
@@ -68,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
         DateTime(startPicked.year, startPicked.month, startPicked.day),
         DateTime(endPicked.year, endPicked.month, endPicked.day),
       );
+      await _checkOverdueTransactions();
     }
   }
 
@@ -76,7 +104,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     if (!canDelete) {
-      // Check which condition failed
       final hasInternet = await ConnectivityService.instance.hasInternetConnection();
       if (!mounted) return;
       
@@ -121,127 +148,224 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _navigateToAddExpense() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AddExpenseScreen()),
-    );
+    final result = await context.push<bool>('/add-expense');
     if (result == true && mounted) {
-      _controller.loadExpenses();
+      _loadData();
     }
   }
 
   Future<void> _navigateToEditExpense(Expense expense) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => AddExpenseScreen(expense: expense)),
-    );
+    final result = await context.push<bool>('/add-expense', extra: expense);
     if (result == true && mounted) {
-      _controller.loadExpenses();
+      _loadData();
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _controller,
-      child: Scaffold(
-        appBar: ExpenseAppBar(
-          startDate: _controller.startDate,
-          endDate: _controller.endDate,
-          formatDate: ExpenseUtils.formatDate,
-          onCloudSync: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SyncSetupScreen()),
-            );
+  void _showSyncStatusBottomSheet(BuildContext context, ExpenseViewModel controller) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SyncStatusBottomSheet(
+          syncStatus: controller.syncStatus,
+          unsyncedCount: controller.unsyncedCount,
+          onSyncNow: () {
+            Navigator.pop(context);
+            _loadData();
+          },
+          onConfigure: () async {
+            Navigator.pop(context);
+            final result = await context.push<bool>('/sync-setup');
             if (result == true && mounted) {
-              _controller.loadExpenses();
+              _loadData();
             }
           },
-          onBorrowLend: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const DeferredBorrowLend()),
-            );
-          },
-          onDateRange: _selectDateRange,
-          onClearFilter: _controller.startDate != null && _controller.endDate != null
-              ? () => _controller.clearDateFilter()
-              : null,
-        ),
-        body: Consumer<ExpenseController>(
-          builder: (context, controller, child) {
-            if (controller.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        );
+      },
+    );
+  }
 
-            if (controller.errorMessage != null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Error: ${controller.errorMessage}'),
-                    ElevatedButton(
-                      onPressed: () => controller.loadExpenses(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return RefreshIndicator(
-              onRefresh: () => controller.loadExpenses(),
-              child: Column(
-                children: [
-                  ExpenseStatisticsSection(
-                    totalExpenses: controller.totalExpenses,
-                    todayOrRangeExpenses: controller.startDate != null && controller.endDate != null
-                        ? controller.selectedDateTotal
-                        : controller.todayExpenses,
-                    todayOrRangeLabel: controller.startDate != null && controller.endDate != null
-                        ? 'Date Range'
-                        : 'Today',
-                  ),
-                  Expanded(
-                    child: controller.expenses.isEmpty
-                        ? const EmptyExpenseList()
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            itemCount: controller.expenses.length,
-                            itemBuilder: (context, index) {
-                              final expense = controller.expenses[index];
-                              return ExpenseListItem(
-                                expense: expense,
-                                onDelete: () => _handleDelete(expense.id!),
-                                onEdit: () => _navigateToEditExpense(expense),
-                                getCategoryColor: ExpenseUtils.getCategoryColor,
-                                getCategoryIcon: ExpenseUtils.getCategoryIcon,
-                                formatDate: ExpenseUtils.formatDate,
-                                formatTime: ExpenseUtils.formatTime,
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
+  Future<void> _showBudgetDialog(BuildContext context, ExpenseViewModel controller) async {
+    final textController = TextEditingController(
+      text: controller.budgetLimit > 0 ? controller.budgetLimit.toStringAsFixed(0) : '',
+    );
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Set Monthly Budget'),
+        content: TextField(
+          controller: textController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            hintText: 'Enter monthly limit (e.g. 500)',
+            prefixText: '\$',
+          ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _navigateToAddExpense,
-          backgroundColor: Colors.blue.shade700,
-          icon: const Icon(Icons.add),
-          label: const Text('Add Expense'),
-        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final val = double.tryParse(textController.text) ?? 0.0;
+              controller.setBudgetLimit(val);
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }
 
   @override
+  Widget build(BuildContext context) {
+    return Consumer<ExpenseViewModel>(
+      builder: (context, controller, child) {
+        final categories = ['All', 'Food', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Others'];
+
+          return Scaffold(
+            appBar: ExpenseAppBar(
+              startDate: controller.startDate,
+              endDate: controller.endDate,
+              formatDate: ExpenseUtils.formatDate,
+              syncStatus: controller.syncStatus,
+              unsyncedCount: controller.unsyncedCount,
+              onSyncTap: () => _showSyncStatusBottomSheet(context, controller),
+              onBorrowLend: () async {
+                await context.push('/borrow-lend');
+                await _checkOverdueTransactions();
+              },
+              onDateRange: _selectDateRange,
+              onInsights: () => context.push('/insights'),
+              onClearFilter: controller.startDate != null && controller.endDate != null
+                  ? () => controller.clearDateFilter()
+                  : null,
+            ),
+            body: controller.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : (controller.errorMessage != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Error: ${controller.errorMessage}'),
+                            ElevatedButton(
+                              onPressed: () => _loadData(),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => _loadData(),
+                        child: Column(
+                          children: [
+                            ExpenseStatisticsSection(
+                              totalExpenses: controller.totalExpenses,
+                              todayOrRangeExpenses: controller.startDate != null && controller.endDate != null
+                                  ? controller.selectedDateTotal
+                                  : controller.todayExpenses,
+                              todayOrRangeLabel: controller.startDate != null && controller.endDate != null
+                                  ? 'Date Range'
+                                  : 'Today',
+                            ),
+                            BudgetCard(
+                              controller: controller,
+                              onEdit: () => _showBudgetDialog(context, controller),
+                            ),
+                            OverdueWarningBanner(
+                              count: _overdueTransactions.length,
+                              onTap: () async {
+                                await context.push('/borrow-lend');
+                                await _checkOverdueTransactions();
+                              },
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: TextField(
+                                decoration: const InputDecoration(
+                                  hintText: 'Search expenses...',
+                                  prefixIcon: Icon(Icons.search),
+                                ),
+                                onChanged: (val) => controller.updateFilters(query: val),
+                              ),
+                            ),
+                            SizedBox(
+                              height: 38,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                itemCount: categories.length,
+                                itemBuilder: (context, index) {
+                                  final cat = categories[index];
+                                  final isSelected = controller.selectedCategory == cat;
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                    child: ChoiceChip(
+                                      label: Text(cat),
+                                      selected: isSelected,
+                                      onSelected: (selected) {
+                                        if (selected) {
+                                          controller.updateFilters(category: cat);
+                                        }
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: controller.filteredExpenses.isEmpty
+                                  ? const EmptyExpenseList()
+                                  : ListView.builder(
+                                      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 80),
+                                      physics: const AlwaysScrollableScrollPhysics(),
+                                      itemCount: controller.filteredExpenses.length,
+                                      itemBuilder: (context, index) {
+                                        final expense = controller.filteredExpenses[index];
+                                        return ExpenseListItem(
+                                          expense: expense,
+                                          onDelete: () => _handleDelete(expense.id!),
+                                          onEdit: () => _navigateToEditExpense(expense),
+                                          onTap: () => ExpenseDetailsDialog.show(
+                                            context,
+                                            expense: expense,
+                                            formatDate: ExpenseUtils.formatDate,
+                                            formatTime: ExpenseUtils.formatTime,
+                                            getCategoryColor: ExpenseUtils.getCategoryColor,
+                                            getCategoryIcon: ExpenseUtils.getCategoryIcon,
+                                          ),
+                                          getCategoryColor: ExpenseUtils.getCategoryColor,
+                                          getCategoryIcon: ExpenseUtils.getCategoryIcon,
+                                          formatDate: ExpenseUtils.formatDate,
+                                          formatTime: ExpenseUtils.formatTime,
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ],
+                        ),
+                      )),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: _navigateToAddExpense,
+              icon: const Icon(Icons.add),
+              label: Text(
+                'Add Expense',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+              ),
+            ),
+          );
+        },
+      );
+  }
+
+  @override
   void dispose() {
-    _controller.dispose();
     super.dispose();
   }
 }

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import '../services/cloud_sync_service.dart';
-import '../presentation/widgets/user_profile_card.dart';
-import '../presentation/widgets/google_sign_in_button.dart';
-import '../presentation/widgets/disable_sync_button.dart';
-import '../presentation/widgets/sync_info_card.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
+import 'package:test_new_things/data/services/exception_handler.dart';
+import 'package:test_new_things/data/services/database_helper.dart';
+import 'package:test_new_things/ui/features/sync/views/widgets/user_profile_card.dart';
+import 'package:test_new_things/ui/features/sync/views/widgets/google_sign_in_button.dart';
+import 'package:test_new_things/ui/features/sync/views/widgets/disable_sync_button.dart';
+import 'package:test_new_things/ui/features/sync/views/widgets/sync_info_card.dart';
 
 class SyncSetupScreen extends StatefulWidget {
   const SyncSetupScreen({super.key});
@@ -13,17 +17,27 @@ class SyncSetupScreen extends StatefulWidget {
 }
 
 class _SyncSetupScreenState extends State<SyncSetupScreen> {
-  final CloudSyncService _syncService = CloudSyncService();
+  late final CloudSyncService _syncService;
   bool _isLoading = false;
   bool _isSignedIn = false;
   String? _userEmail;
   String? _userName;
   String? _userPhotoUrl;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _syncService = context.read<CloudSyncService>();
+      _checkSignInStatus();
+      _initialized = true;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _checkSignInStatus();
   }
 
   Future<void> _checkSignInStatus() async {
@@ -63,7 +77,7 @@ class _SyncSetupScreenState extends State<SyncSetupScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context, true);
+          context.pop(true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -75,27 +89,28 @@ class _SyncSetupScreenState extends State<SyncSetupScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       setState(() {
         _isLoading = false;
       });
-      
-      final errorMessage = e.toString().contains('No internet connection')
-          ? 'No internet connection'
-          : 'Failed to sign in. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+
+      final errorMessage = ExceptionHandler.mapNetworkError(e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _disableCloudSync() async {
     setState(() => _isLoading = true);
     await _syncService.signOut();
+    await DatabaseHelper.instance.clearDatabase();
     if (!mounted) return;
     
     setState(() {
@@ -105,11 +120,11 @@ class _SyncSetupScreenState extends State<SyncSetupScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Cloud sync disabled.'),
-        backgroundColor: Colors.orange,
+        content: Text('Logged out. Local data cleared from this device.'),
+        backgroundColor: Colors.blue,
       ),
     );
-    Navigator.pop(context, true);
+    context.pop(true);
   }
 
   @override
@@ -120,34 +135,36 @@ class _SyncSetupScreenState extends State<SyncSetupScreen> {
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            UserProfileCard(
-              isSignedIn: _isSignedIn,
-              userName: _userName,
-              userEmail: _userEmail,
-              userPhotoUrl: _userPhotoUrl,
-              description: _isSignedIn
-                  ? 'Your data is syncing to the cloud. You can access it from any device using the same Google account.'
-                  : 'Sign in with Google to sync your expenses and borrow/lend data across all your devices.',
-            ),
-            const SizedBox(height: 24),
-            if (!_isSignedIn)
-              GoogleSignInButton(
-                isLoading: _isLoading,
-                onPressed: _signInWithGoogle,
-              )
-            else
-              DisableSyncButton(
-                isLoading: _isLoading,
-                onPressed: _disableCloudSync,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              UserProfileCard(
+                isSignedIn: _isSignedIn,
+                userName: _userName,
+                userEmail: _userEmail,
+                userPhotoUrl: _userPhotoUrl,
+                description: _isSignedIn
+                    ? 'Your data is syncing to the cloud. You can access it from any device using the same Google account.'
+                    : 'Sign in with Google to sync your expenses and borrow/lend data across all your devices.',
               ),
-            const SizedBox(height: 16),
-            const SyncInfoCard(),
-          ],
+              const SizedBox(height: 24),
+              if (!_isSignedIn)
+                GoogleSignInButton(
+                  isLoading: _isLoading,
+                  onPressed: _signInWithGoogle,
+                )
+              else
+                DisableSyncButton(
+                  isLoading: _isLoading,
+                  onPressed: _disableCloudSync,
+                ),
+              const SizedBox(height: 16),
+              const SyncInfoCard(),
+            ],
+          ),
         ),
       ),
     );
