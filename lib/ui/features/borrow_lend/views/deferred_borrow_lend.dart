@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'borrow_lend_screen.dart' deferred as borrow_lend;
+import 'package:test_new_things/ui/features/borrow_lend/views/borrow_lend_screen.dart' deferred as borrow_lend;
 
 class DeferredBorrowLend extends StatefulWidget {
   const DeferredBorrowLend({super.key});

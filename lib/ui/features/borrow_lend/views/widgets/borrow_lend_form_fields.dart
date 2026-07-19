@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:test_new_things/ui/core/utils/form_validators.dart';
 
 class BorrowLendFormFields extends StatelessWidget {
   final GlobalKey<FormState> formKey;
@@ -10,6 +11,9 @@ class BorrowLendFormFields extends StatelessWidget {
   final ValueChanged<String> onTypeChanged;
   final DateTime selectedDate;
   final VoidCallback onSelectDate;
+  final DateTime? selectedDueDate;
+  final VoidCallback onSelectDueDate;
+  final VoidCallback onClearDueDate;
 
   const BorrowLendFormFields({
     super.key,
@@ -21,6 +25,9 @@ class BorrowLendFormFields extends StatelessWidget {
     required this.onTypeChanged,
     required this.selectedDate,
     required this.onSelectDate,
+    required this.selectedDueDate,
+    required this.onSelectDueDate,
+    required this.onClearDueDate,
   });
 
   @override
@@ -55,28 +62,31 @@ class BorrowLendFormFields extends StatelessWidget {
                           width: 2,
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.arrow_downward,
-                            color: selectedType == 'borrow'
-                                ? Colors.red.shade700
-                                : Colors.grey,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'You Owe',
-                            style: TextStyle(
-                              fontWeight: selectedType == 'borrow'
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.arrow_downward,
                               color: selectedType == 'borrow'
                                   ? Colors.red.shade700
                                   : Colors.grey,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Text(
+                              'You Owe',
+                              style: TextStyle(
+                                fontWeight: selectedType == 'borrow'
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: selectedType == 'borrow'
+                                    ? Colors.red.shade700
+                                    : Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -99,28 +109,31 @@ class BorrowLendFormFields extends StatelessWidget {
                           width: 2,
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.arrow_upward,
-                            color: selectedType == 'lend'
-                                ? Colors.green.shade700
-                                : Colors.grey,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Owed to You',
-                            style: TextStyle(
-                              fontWeight: selectedType == 'lend'
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.arrow_upward,
                               color: selectedType == 'lend'
                                   ? Colors.green.shade700
                                   : Colors.grey,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Text(
+                              'Owed to You',
+                              style: TextStyle(
+                                fontWeight: selectedType == 'lend'
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: selectedType == 'lend'
+                                    ? Colors.green.shade700
+                                    : Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -136,12 +149,7 @@ class BorrowLendFormFields extends StatelessWidget {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.person),
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter a person name';
-              }
-              return null;
-            },
+            validator: FormValidators.validatePersonName(),
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -155,15 +163,7 @@ class BorrowLendFormFields extends StatelessWidget {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
             ],
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter an amount';
-              }
-              if (double.tryParse(value) == null || double.parse(value) <= 0) {
-                return 'Please enter a valid amount';
-              }
-              return null;
-            },
+            validator: FormValidators.validateAmount(),
           ),
           const SizedBox(height: 16),
           InkWell(
@@ -178,6 +178,36 @@ class BorrowLendFormFields extends StatelessWidget {
                 '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
               ),
             ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: onSelectDueDate,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Due Date (Optional)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.alarm),
+                    ),
+                    child: Text(
+                      selectedDueDate != null
+                          ? '${selectedDueDate!.day}/${selectedDueDate!.month}/${selectedDueDate!.year}'
+                          : 'No due date set',
+                    ),
+                  ),
+                ),
+              ),
+              if (selectedDueDate != null) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.clear, color: Colors.red),
+                  tooltip: 'Clear Due Date',
+                  onPressed: onClearDueDate,
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 16),
           TextFormField(

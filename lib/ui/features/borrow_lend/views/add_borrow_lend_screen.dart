@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import '../data/repositories/borrow_lend_repository_impl.dart';
-import '../domain/usecases/add_borrow_lend.dart';
-import '../domain/usecases/update_borrow_lend.dart';
-import '../presentation/widgets/borrow_lend_form_fields.dart';
-import '../models/borrow_lend.dart';
-import '../services/cloud_sync_service.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:test_new_things/domain/repositories/borrow_lend_repository.dart';
+import 'package:test_new_things/domain/usecases/add_borrow_lend.dart';
+import 'package:test_new_things/domain/usecases/update_borrow_lend.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/borrow_lend_form_fields.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
 
 class AddBorrowLendScreen extends StatefulWidget {
   final BorrowLend? transaction;
@@ -20,17 +23,25 @@ class _AddBorrowLendScreenState extends State<AddBorrowLendScreen> {
   final _personNameController = TextEditingController();
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _addBorrowLend = AddBorrowLend(
-    BorrowLendRepositoryImpl(),
-    CloudSyncService(),
-  );
-  final _updateBorrowLend = UpdateBorrowLend(
-    BorrowLendRepositoryImpl(),
-    CloudSyncService(),
-  );
+  late final AddBorrowLend _addBorrowLend;
+  late final UpdateBorrowLend _updateBorrowLend;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final repository = context.read<BorrowLendRepository>();
+      final cloudSync = context.read<CloudSyncService>();
+      _addBorrowLend = AddBorrowLend(repository, cloudSync);
+      _updateBorrowLend = UpdateBorrowLend(repository, cloudSync);
+      _initialized = true;
+    }
+  }
 
   String _selectedType = 'borrow';
   DateTime _selectedDate = DateTime.now();
+  DateTime? _selectedDueDate;
   late final bool _isEditing;
 
   @override
@@ -57,6 +68,7 @@ class _AddBorrowLendScreenState extends State<AddBorrowLendScreen> {
         transaction.date.month,
         transaction.date.day,
       );
+      _selectedDueDate = transaction.dueDate;
     }
   }
 
@@ -75,18 +87,48 @@ class _AddBorrowLendScreenState extends State<AddBorrowLendScreen> {
     }
   }
 
+  Future<void> _selectDueDate() async {
+    if (!mounted) return;
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDueDate ?? DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+      helpText: 'Select Due Date',
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _selectedDueDate = picked;
+      });
+    }
+  }
+
+  void _clearDueDate() {
+    setState(() {
+      _selectedDueDate = null;
+    });
+  }
+
+  bool _isSaving = false;
+
   Future<void> _saveTransaction() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+    });
 
     final transaction = BorrowLend(
       id: widget.transaction?.id,
       personName: _personNameController.text.trim(),
       amount: double.parse(_amountController.text),
-      date: _selectedDate,
+      description: _descriptionController.text.trim(),
       type: _selectedType,
-      description: _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
+      date: _selectedDate,
+      completed: widget.transaction?.completed ?? false,
+      repayments: widget.transaction?.repayments ?? const [],
+      dueDate: _selectedDueDate,
     );
 
     try {
@@ -95,44 +137,55 @@ class _AddBorrowLendScreenState extends State<AddBorrowLendScreen> {
       } else {
         await _addBorrowLend.call(transaction);
       }
+
+      final hasInternet = await ConnectivityService.instance.hasInternetConnection();
       final isSignedIn = _isEditing
           ? await _updateBorrowLend.cloudSync.isSignedIn()
           : await _addBorrowLend.cloudSync.isSignedIn();
       
       if (mounted) {
-        Navigator.pop(context, true);
+        context.pop(true);
+
+        final String message;
+        if (isSignedIn && hasInternet) {
+          message = _isEditing
+              ? 'Transaction updated and synced to cloud!'
+              : 'Transaction added and synced to cloud!';
+        } else if (isSignedIn && !hasInternet) {
+          message = _isEditing
+              ? 'Transaction updated locally. Will sync when online.'
+              : 'Transaction added locally. Will sync when online.';
+        } else {
+          message = _isEditing
+              ? (_selectedType == 'borrow'
+                  ? 'Borrowed money updated successfully!'
+                  : 'Lent money updated successfully!')
+              : (_selectedType == 'borrow'
+                  ? 'Borrowed money added successfully!'
+                  : 'Lent money added successfully!');
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              _isEditing
-                  ? (isSignedIn
-                      ? 'Transaction updated and synced to cloud!'
-                      : 'Transaction updated successfully!')
-                  : (isSignedIn
-                      ? (_selectedType == 'borrow'
-                          ? 'Borrowed money added and synced to cloud!'
-                          : 'Lent money added and synced to cloud!')
-                      : (_selectedType == 'borrow'
-                          ? 'Borrowed money added!'
-                          : 'Lent money added!')),
-            ),
+            content: Text(message),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        final errorMessage = e.toString().contains('No internet connection')
-            ? 'No internet connection. Will sync when online.'
-            : 'Failed to sync to cloud. Will sync when online.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
+            content: Text('Failed to save transaction: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
-        Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
       }
     }
   }
@@ -160,13 +213,24 @@ class _AddBorrowLendScreenState extends State<AddBorrowLendScreen> {
           },
           selectedDate: _selectedDate,
           onSelectDate: _selectDate,
+          selectedDueDate: _selectedDueDate,
+          onSelectDueDate: _selectDueDate,
+          onClearDueDate: _clearDueDate,
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _saveTransaction,
-        backgroundColor: Colors.purple.shade700,
-        icon: const Icon(Icons.save),
-        label: Text(_isEditing ? 'Update Transaction' : 'Save Transaction'),
+        onPressed: _isSaving ? null : _saveTransaction,
+        backgroundColor: _isSaving ? Colors.grey : Colors.purple.shade700,
+        icon: _isSaving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Icon(Icons.save),
+        label: Text(_isSaving
+            ? 'Saving...'
+            : (_isEditing ? 'Update Transaction' : 'Save Transaction')),
       ),
     );
   }

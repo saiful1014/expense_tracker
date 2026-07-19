@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../data/repositories/borrow_lend_repository_impl.dart';
-import '../domain/usecases/get_borrow_lend.dart';
-import '../domain/usecases/delete_borrow_lend.dart';
-import '../domain/usecases/mark_transaction_completed.dart';
-import '../domain/usecases/mark_transaction_pending.dart';
-import '../presentation/controllers/borrow_lend_controller.dart';
-import '../presentation/widgets/borrow_lend_summary_cards.dart';
-import '../presentation/widgets/transaction_card.dart';
-import '../presentation/widgets/empty_transaction_list.dart';
-import '../presentation/utils/borrow_lend_utils.dart';
-import '../presentation/dialogs/delete_transaction_dialog.dart';
-import '../presentation/dialogs/mark_completed_dialog.dart';
-import '../presentation/dialogs/mark_pending_dialog.dart';
-import '../presentation/dialogs/no_internet_dialog.dart';
-import '../presentation/dialogs/not_signed_in_dialog.dart';
-import '../services/connectivity_service.dart';
-import 'add_borrow_lend_screen.dart';
-import '../models/borrow_lend.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/repayments_dialog.dart';
+import 'package:test_new_things/domain/repositories/borrow_lend_repository.dart';
+import 'package:test_new_things/domain/usecases/get_borrow_lend.dart';
+import 'package:test_new_things/domain/usecases/delete_borrow_lend.dart';
+import 'package:test_new_things/domain/usecases/mark_transaction_completed.dart';
+import 'package:test_new_things/domain/usecases/mark_transaction_pending.dart';
+import 'package:test_new_things/ui/features/borrow_lend/view_models/borrow_lend_view_model.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/borrow_lend_summary_cards.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/transaction_card.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/empty_transaction_list.dart';
+import 'package:test_new_things/ui/core/utils/borrow_lend_utils.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/delete_transaction_dialog.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/mark_completed_dialog.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/mark_pending_dialog.dart';
+import 'package:test_new_things/ui/core/dialogs/no_internet_dialog.dart';
+import 'package:test_new_things/ui/core/dialogs/not_signed_in_dialog.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
+import 'package:test_new_things/ui/features/borrow_lend/views/widgets/borrow_lend_details_dialog.dart';
+
+import 'package:google_fonts/google_fonts.dart';
+import 'package:test_new_things/ui/core/theme/app_theme.dart';
 
 class BorrowLendScreen extends StatefulWidget {
   const BorrowLendScreen({super.key});
@@ -28,32 +34,42 @@ class BorrowLendScreen extends StatefulWidget {
 
 class _BorrowLendScreenState extends State<BorrowLendScreen>
     with SingleTickerProviderStateMixin {
-  late BorrowLendController _controller;
+  late BorrowLendViewModel _controller;
   late TabController _tabController;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    
-    final repository = BorrowLendRepositoryImpl();
-    final getBorrowLend = GetBorrowLend(repository);
-    final deleteBorrowLend = DeleteBorrowLend(
-      repository: repository,
-      connectivity: ConnectivityService.instance,
-      cloudSync: repository.cloudSync,
-    );
-    final markCompleted = MarkTransactionCompleted(repository);
-    final markPending = MarkTransactionPending(repository);
-    
-    _controller = BorrowLendController(
-      repository,
-      getBorrowLend,
-      deleteBorrowLend,
-      markCompleted,
-      markPending,
-    );
-    _controller.loadBorrowLend();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final repository = context.read<BorrowLendRepository>();
+      final connectivity = context.read<ConnectivityService>();
+      final cloudSync = context.read<CloudSyncService>();
+      final getBorrowLend = GetBorrowLend(repository);
+      final deleteBorrowLend = DeleteBorrowLend(
+        repository: repository,
+        connectivity: connectivity,
+        cloudSync: cloudSync,
+      );
+      final markCompleted = MarkTransactionCompleted(repository);
+      final markPending = MarkTransactionPending(repository);
+      
+      _controller = BorrowLendViewModel(
+        repository,
+        getBorrowLend,
+        deleteBorrowLend,
+        markCompleted,
+        markPending,
+      );
+      _controller.loadBorrowLend();
+      _initialized = true;
+    }
   }
 
   @override
@@ -138,6 +154,39 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
     }
   }
 
+  void _showRepaymentsDialog(BorrowLend transaction) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return RepaymentsDialog(
+          transaction: transaction,
+          onAddRepayment: (amount) async {
+            try {
+              await _controller.addRepayment(transaction, amount);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Repayment added successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to add repayment: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _handleMarkPending(int id) async {
     if (!mounted) return;
     final confirm = await MarkPendingDialog.show(context);
@@ -166,50 +215,54 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
   }
 
   Future<void> _navigateToAddBorrowLend() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AddBorrowLendScreen()),
-    );
+    final result = await context.push<bool>('/add-borrow-lend');
     if (result == true && mounted) {
       _controller.loadBorrowLend();
     }
   }
 
   Future<void> _navigateToEditBorrowLend(BorrowLend transaction) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddBorrowLendScreen(transaction: transaction),
-      ),
-    );
+    final result = await context.push<bool>('/add-borrow-lend', extra: transaction);
     if (result == true && mounted) {
       _controller.loadBorrowLend();
     }
   }
 
+  void _showTransactionDetails(BorrowLend transaction) {
+    BorrowLendDetailsDialog.show(
+      context,
+      transaction: transaction,
+      formatDate: BorrowLendUtils.formatDate,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return ChangeNotifierProvider.value(
       value: _controller,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Borrow & Lend'),
-          backgroundColor: Colors.purple.shade700,
-          foregroundColor: Colors.white,
-          elevation: 0,
+          title: Text(
+            'Borrow & Lend',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
           bottom: TabBar(
             controller: _tabController,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
+            indicatorColor: Theme.of(context).colorScheme.primary,
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
+            labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+            unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 13),
             tabs: const [
-              Tab(text: 'You Owe', icon: Icon(Icons.arrow_downward)),
-              Tab(text: 'Owed to You', icon: Icon(Icons.arrow_upward)),
-              Tab(text: 'Completed', icon: Icon(Icons.check_circle)),
+              Tab(text: 'You Owe', icon: Icon(Icons.arrow_downward_outlined, size: 18)),
+              Tab(text: 'Owed to You', icon: Icon(Icons.arrow_upward_outlined, size: 18)),
+              Tab(text: 'Completed', icon: Icon(Icons.check_circle_outline, size: 18)),
             ],
           ),
         ),
-        body: Consumer<BorrowLendController>(
+        body: Consumer<BorrowLendViewModel>(
           builder: (context, controller, child) {
             if (controller.isLoading) {
               return const Center(child: CircularProgressIndicator());
@@ -243,11 +296,11 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                       // Borrowed Tab
                       controller.borrowedList.isEmpty
                           ? const EmptyTransactionList(
-                              icon: Icons.arrow_downward,
+                              icon: Icons.arrow_downward_outlined,
                               message: 'No borrowed money',
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 80),
                               itemCount: controller.borrowedList.length,
                               itemBuilder: (context, index) {
                                 final transaction = controller.borrowedList[index];
@@ -255,8 +308,10 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                                   transaction: transaction,
                                   isBorrowed: true,
                                   onMarkCompleted: () => _handleMarkCompleted(transaction.id!),
+                                  onAddRepayment: () => _showRepaymentsDialog(transaction),
                                   onEdit: () => _navigateToEditBorrowLend(transaction),
                                   onDelete: () => _handleDelete(transaction.id!),
+                                  onTap: () => _showTransactionDetails(transaction),
                                   formatDate: BorrowLendUtils.formatDate,
                                 );
                               },
@@ -264,11 +319,11 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                       // Lent Tab
                       controller.lentList.isEmpty
                           ? const EmptyTransactionList(
-                              icon: Icons.arrow_upward,
+                              icon: Icons.arrow_upward_outlined,
                               message: 'No lent money',
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 80),
                               itemCount: controller.lentList.length,
                               itemBuilder: (context, index) {
                                 final transaction = controller.lentList[index];
@@ -276,8 +331,10 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                                   transaction: transaction,
                                   isBorrowed: false,
                                   onMarkCompleted: () => _handleMarkCompleted(transaction.id!),
+                                  onAddRepayment: () => _showRepaymentsDialog(transaction),
                                   onEdit: () => _navigateToEditBorrowLend(transaction),
                                   onDelete: () => _handleDelete(transaction.id!),
+                                  onTap: () => _showTransactionDetails(transaction),
                                   formatDate: BorrowLendUtils.formatDate,
                                 );
                               },
@@ -289,7 +346,7 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                               message: 'No completed transactions',
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 80),
                               itemCount: controller.completedList.length,
                               itemBuilder: (context, index) {
                                 final transaction = controller.completedList[index];
@@ -300,6 +357,7 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
                                   onMarkPending: () => _handleMarkPending(transaction.id!),
                                   onEdit: () => _navigateToEditBorrowLend(transaction),
                                   onDelete: () => _handleDelete(transaction.id!),
+                                  onTap: () => _showTransactionDetails(transaction),
                                   formatDate: BorrowLendUtils.formatDate,
                                 );
                               },
@@ -313,9 +371,11 @@ class _BorrowLendScreenState extends State<BorrowLendScreen>
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _navigateToAddBorrowLend,
-          backgroundColor: Colors.purple.shade700,
           icon: const Icon(Icons.add),
-          label: const Text('Add Transaction'),
+          label: Text(
+            'Add Transaction',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
         ),
       ),
     );
