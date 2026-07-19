@@ -1,7 +1,7 @@
-import '../../domain/repositories/borrow_lend_repository.dart';
-import '../../models/borrow_lend.dart';
-import '../../database/database_helper.dart';
-import '../../services/cloud_sync_service.dart';
+import 'package:test_new_things/domain/repositories/borrow_lend_repository.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
+import 'package:test_new_things/data/services/database_helper.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
 
 class BorrowLendRepositoryImpl implements BorrowLendRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
@@ -57,6 +57,16 @@ class BorrowLendRepositoryImpl implements BorrowLendRepository {
   @override
   Future<void> markAsPending(int id) async {
     await _dbHelper.markBorrowLendAsPending(id);
+  }
+
+  @override
+  Future<BorrowLend?> markAsCompletedAndGet(int id) async {
+    return await _dbHelper.markBorrowLendAsCompletedAndGet(id);
+  }
+
+  @override
+  Future<BorrowLend?> markAsPendingAndGet(int id) async {
+    return await _dbHelper.markBorrowLendAsPendingAndGet(id);
   }
 
   @override

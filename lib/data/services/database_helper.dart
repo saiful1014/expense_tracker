@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/expense.dart';
-import '../models/borrow_lend.dart';
+import 'package:test_new_things/domain/models/expense.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -21,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4, // Updated version for synced column
+      version: 7, // Updated version for due date & recurrence
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -35,9 +36,14 @@ class DatabaseHelper {
         amount REAL NOT NULL,
         date TEXT NOT NULL,
         category TEXT NOT NULL,
-        synced INTEGER DEFAULT 0
+        synced INTEGER DEFAULT 0,
+        is_recurring INTEGER DEFAULT 0,
+        recurrence_interval TEXT,
+        last_processed TEXT
       )
     ''');
+    await db.execute('CREATE INDEX idx_expenses_date ON expenses(date)');
+    await db.execute('CREATE INDEX idx_expenses_synced ON expenses(synced)');
     await db.execute('''
       CREATE TABLE borrow_lend (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,9 +53,13 @@ class DatabaseHelper {
         type TEXT NOT NULL,
         description TEXT,
         completed INTEGER DEFAULT 0,
-        synced INTEGER DEFAULT 0
+        synced INTEGER DEFAULT 0,
+        repayments TEXT DEFAULT '[]',
+        due_date TEXT
       )
     ''');
+    await db.execute('CREATE INDEX idx_borrow_lend_type_completed ON borrow_lend(type, completed)');
+    await db.execute('CREATE INDEX idx_borrow_lend_synced ON borrow_lend(synced)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -86,6 +96,51 @@ class DatabaseHelper {
       } catch (e) {
         // Column might already exist, ignore error
       }
+    }
+    if (oldVersion < 5) {
+      // Add indexes for better query performance
+      try {
+        await db.execute('CREATE INDEX idx_expenses_date ON expenses(date)');
+      } catch (e) {
+        // Index might already exist, ignore error
+      }
+      try {
+        await db.execute('CREATE INDEX idx_expenses_synced ON expenses(synced)');
+      } catch (e) {
+        // Index might already exist, ignore error
+      }
+      try {
+        await db.execute('CREATE INDEX idx_borrow_lend_type_completed ON borrow_lend(type, completed)');
+      } catch (e) {
+        // Index might already exist, ignore error
+      }
+      try {
+        await db.execute('CREATE INDEX idx_borrow_lend_synced ON borrow_lend(synced)');
+      } catch (e) {
+        // Index might already exist, ignore error
+      }
+    }
+    if (oldVersion < 6) {
+      // Add repayments column to store partial payments history as JSON
+      try {
+        await db.execute("ALTER TABLE borrow_lend ADD COLUMN repayments TEXT DEFAULT '[]'");
+      } catch (e) {
+        // Column might already exist, ignore error
+      }
+    }
+    if (oldVersion < 7) {
+      try {
+        await db.execute("ALTER TABLE expenses ADD COLUMN is_recurring INTEGER DEFAULT 0");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE expenses ADD COLUMN recurrence_interval TEXT");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE expenses ADD COLUMN last_processed TEXT");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE borrow_lend ADD COLUMN due_date TEXT");
+      } catch (_) {}
     }
   }
 
@@ -205,6 +260,8 @@ class DatabaseHelper {
         'description': borrowLend.description,
         'completed': borrowLend.completed ? 1 : 0,
         'synced': 0,
+        'repayments': jsonEncode(borrowLend.repayments.map((r) => r.toMap()).toList()),
+        'due_date': borrowLend.dueDate?.toIso8601String(),
       },
       where: 'id = ?',
       whereArgs: [borrowLend.id],
@@ -249,6 +306,45 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<BorrowLend?> getBorrowLendById(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'borrow_lend',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (result.isEmpty) return null;
+    return BorrowLend.fromMap(result.first);
+  }
+
+  Future<BorrowLend?> markBorrowLendAsCompletedAndGet(int id) async {
+    final db = await database;
+    await db.update(
+      'borrow_lend',
+      {
+        'completed': 1,
+        'synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return await getBorrowLendById(id);
+  }
+
+  Future<BorrowLend?> markBorrowLendAsPendingAndGet(int id) async {
+    final db = await database;
+    await db.update(
+      'borrow_lend',
+      {
+        'completed': 0,
+        'synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return await getBorrowLendById(id);
   }
 
   Future<int> markBorrowLendAsPending(int id) async {
@@ -348,6 +444,12 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> clearDatabase() async {
+    final db = await database;
+    await db.delete('expenses');
+    await db.delete('borrow_lend');
   }
 
   Future<void> close() async {

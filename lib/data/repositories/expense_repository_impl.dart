@@ -1,7 +1,7 @@
-import '../../domain/repositories/expense_repository.dart';
-import '../../models/expense.dart';
-import '../../database/database_helper.dart';
-import '../../services/cloud_sync_service.dart';
+import 'package:test_new_things/domain/repositories/expense_repository.dart';
+import 'package:test_new_things/domain/models/expense.dart';
+import 'package:test_new_things/data/services/database_helper.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
 
 class ExpenseRepositoryImpl implements ExpenseRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;

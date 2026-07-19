@@ -2,9 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../models/expense.dart';
-import '../models/borrow_lend.dart';
-import 'connectivity_service.dart';
+import 'package:test_new_things/domain/models/expense.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
+import 'package:test_new_things/data/services/exception_handler.dart';
 
 class CloudSyncService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -36,6 +37,9 @@ class CloudSyncService {
       'amount': expense.amount,
       'date': expense.date.toIso8601String(),
       'category': expense.category,
+      'is_recurring': expense.isRecurring,
+      'recurrence_interval': expense.recurrenceInterval,
+      'last_processed': expense.lastProcessed?.toIso8601String(),
       'lastUpdated': FieldValue.serverTimestamp(),
     });
   }
@@ -71,9 +75,14 @@ class CloudSyncService {
       return Expense(
         id: int.tryParse(doc.id),
         description: data['description'] as String,
-        amount: data['amount'] as double,
+        amount: (data['amount'] as num).toDouble(),
         date: DateTime.parse(data['date'] as String),
         category: data['category'] as String,
+        isRecurring: data['is_recurring'] as bool? ?? false,
+        recurrenceInterval: data['recurrence_interval'] as String?,
+        lastProcessed: data['last_processed'] != null
+            ? DateTime.parse(data['last_processed'] as String)
+            : null,
       );
     }).toList();
   }
@@ -97,6 +106,8 @@ class CloudSyncService {
       'type': borrowLend.type,
       'description': borrowLend.description,
       'completed': borrowLend.completed,
+      'repayments': borrowLend.repayments.map((r) => r.toMap()).toList(),
+      'due_date': borrowLend.dueDate?.toIso8601String(),
       'lastUpdated': FieldValue.serverTimestamp(),
     });
   }
@@ -132,11 +143,17 @@ class CloudSyncService {
       return BorrowLend(
         id: int.tryParse(doc.id),
         personName: data['person_name'] as String,
-        amount: data['amount'] as double,
+        amount: (data['amount'] as num).toDouble(),
         date: DateTime.parse(data['date'] as String),
         type: data['type'] as String,
         description: data['description'] as String?,
         completed: data['completed'] as bool? ?? false,
+        repayments: data['repayments'] != null
+            ? (data['repayments'] as List)
+                .map((item) => Repayment.fromMap(Map<String, dynamic>.from(item as Map)))
+                .toList()
+            : const [],
+        dueDate: data['due_date'] != null ? DateTime.parse(data['due_date'] as String) : null,
       );
     }).toList();
   }
@@ -168,6 +185,10 @@ class CloudSyncService {
       // Sign in to Firebase with the Google credential
       await _auth.signInWithCredential(credential);
       return true;
+    } on FirebaseAuthException catch (e) {
+      final message = ExceptionHandler.mapFirebaseAuthError(e);
+      debugPrint('Google Sign-In FirebaseAuthException: ${e.code} - $message');
+      throw Exception(message);
     } catch (e) {
       debugPrint('Google Sign-In Error: $e');
       return false;

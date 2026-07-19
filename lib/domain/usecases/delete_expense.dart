@@ -1,6 +1,6 @@
-import '../repositories/expense_repository.dart';
-import '../../services/connectivity_service.dart';
-import '../../services/cloud_sync_service.dart';
+import 'package:test_new_things/domain/repositories/expense_repository.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
 
 class DeleteExpense {
   final ExpenseRepository repository;

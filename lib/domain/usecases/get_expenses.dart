@@ -1,5 +1,5 @@
-import '../../models/expense.dart';
-import '../repositories/expense_repository.dart';
+import 'package:test_new_things/domain/models/expense.dart';
+import 'package:test_new_things/domain/repositories/expense_repository.dart';
 
 class GetExpenses {
   final ExpenseRepository repository;

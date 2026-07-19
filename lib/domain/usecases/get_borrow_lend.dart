@@ -1,5 +1,5 @@
-import '../../models/borrow_lend.dart';
-import '../repositories/borrow_lend_repository.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
+import 'package:test_new_things/domain/repositories/borrow_lend_repository.dart';
 
 class GetBorrowLend {
   final BorrowLendRepository repository;

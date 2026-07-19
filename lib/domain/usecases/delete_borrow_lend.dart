@@ -1,6 +1,7 @@
-import '../repositories/borrow_lend_repository.dart';
-import '../../services/connectivity_service.dart';
-import '../../services/cloud_sync_service.dart';
+import 'package:test_new_things/domain/repositories/borrow_lend_repository.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
+import 'package:test_new_things/data/services/notification_service.dart';
 
 class DeleteBorrowLend {
   final BorrowLendRepository repository;
@@ -22,6 +23,8 @@ class DeleteBorrowLend {
   }
 
   Future<void> call(int id) async {
+    // Cancel any scheduled reminder
+    await NotificationService.instance.cancelNotification(id);
     // Delete from cloud first
     await repository.deleteFromCloud(id);
     // Delete from local database

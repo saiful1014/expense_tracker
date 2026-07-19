@@ -1,4 +1,4 @@
-import '../../models/borrow_lend.dart';
+import 'package:test_new_things/domain/models/borrow_lend.dart';
 
 abstract class BorrowLendRepository {
   Future<List<BorrowLend>> getAllBorrowLend();
@@ -8,6 +8,8 @@ abstract class BorrowLendRepository {
   Future<double> getTotalLent();
   Future<int> insertBorrowLend(BorrowLend borrowLend);
   Future<void> deleteBorrowLend(int id);
+  Future<BorrowLend?> markAsCompletedAndGet(int id);
+  Future<BorrowLend?> markAsPendingAndGet(int id);
   Future<void> markAsCompleted(int id);
   Future<void> markAsPending(int id);
   Future<void> updateBorrowLend(BorrowLend borrowLend);

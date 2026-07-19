@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import '../database/database_helper.dart';
-import '../services/cloud_sync_service.dart';
-import '../services/connectivity_service.dart';
+import 'package:test_new_things/data/services/database_helper.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
 
 class OfflineSyncService {
   static final OfflineSyncService instance = OfflineSyncService._init();

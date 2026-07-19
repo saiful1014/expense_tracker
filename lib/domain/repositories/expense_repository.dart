@@ -1,4 +1,4 @@
-import '../../models/expense.dart';
+import 'package:test_new_things/domain/models/expense.dart';
 
 abstract class ExpenseRepository {
   Future<List<Expense>> getExpenses();
