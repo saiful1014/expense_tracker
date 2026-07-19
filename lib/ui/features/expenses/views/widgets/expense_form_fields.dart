@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:test_new_things/ui/core/utils/form_validators.dart';
 
 class ExpenseFormFields extends StatelessWidget {
   final GlobalKey<FormState> formKey;
@@ -13,6 +14,11 @@ class ExpenseFormFields extends StatelessWidget {
   final VoidCallback onSelectDate;
   final VoidCallback onSelectTime;
 
+  final bool isRecurring;
+  final String recurrenceInterval;
+  final ValueChanged<bool> onRecurringChanged;
+  final ValueChanged<String> onIntervalChanged;
+
   const ExpenseFormFields({
     super.key,
     required this.formKey,
@@ -25,6 +31,10 @@ class ExpenseFormFields extends StatelessWidget {
     required this.selectedTime,
     required this.onSelectDate,
     required this.onSelectTime,
+    required this.isRecurring,
+    required this.recurrenceInterval,
+    required this.onRecurringChanged,
+    required this.onIntervalChanged,
   });
 
   @override
@@ -38,45 +48,29 @@ class ExpenseFormFields extends StatelessWidget {
             controller: descriptionController,
             decoration: const InputDecoration(
               labelText: 'Description',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.description),
+              prefixIcon: Icon(Icons.description_outlined),
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter a description';
-              }
-              return null;
-            },
+            validator: FormValidators.validateDescription(),
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: amountController,
             decoration: const InputDecoration(
               labelText: 'Amount',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.attach_money),
+              prefixIcon: Icon(Icons.attach_money_outlined),
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
             ],
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter an amount';
-              }
-              if (double.tryParse(value) == null || double.parse(value) <= 0) {
-                return 'Please enter a valid amount';
-              }
-              return null;
-            },
+            validator: FormValidators.validateAmount(),
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             initialValue: selectedCategory,
             decoration: const InputDecoration(
               labelText: 'Category',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.category),
+              prefixIcon: Icon(Icons.category_outlined),
             ),
             items: categories.map((category) {
               return DropdownMenuItem(
@@ -95,8 +89,7 @@ class ExpenseFormFields extends StatelessWidget {
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText: 'Date',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.calendar_today),
+                      prefixIcon: Icon(Icons.calendar_today_outlined),
                     ),
                     child: Text(
                       '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
@@ -111,8 +104,7 @@ class ExpenseFormFields extends StatelessWidget {
                   child: InputDecorator(
                     decoration: const InputDecoration(
                       labelText: 'Time',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.access_time),
+                      prefixIcon: Icon(Icons.access_time_outlined),
                     ),
                     child: Text(
                       '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
@@ -122,6 +114,30 @@ class ExpenseFormFields extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          SwitchListTile(
+            title: const Text('Recurring Subscription'),
+            subtitle: const Text('Automatically record this expense periodically'),
+            value: isRecurring,
+            onChanged: onRecurringChanged,
+            secondary: const Icon(Icons.autorenew_outlined),
+          ),
+          if (isRecurring) ...[
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: recurrenceInterval,
+              decoration: const InputDecoration(
+                labelText: 'Interval',
+                prefixIcon: Icon(Icons.repeat_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                DropdownMenuItem(value: 'yearly', child: Text('Yearly')),
+              ],
+              onChanged: (value) => onIntervalChanged(value!),
+            ),
+          ],
         ],
       ),
     );

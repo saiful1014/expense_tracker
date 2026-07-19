@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import '../data/repositories/expense_repository_impl.dart';
-import '../domain/usecases/add_expense.dart';
-import '../domain/usecases/update_expense.dart';
-import '../presentation/widgets/expense_form_fields.dart';
-import '../models/expense.dart';
-import '../services/cloud_sync_service.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:test_new_things/domain/repositories/expense_repository.dart';
+import 'package:test_new_things/domain/usecases/add_expense.dart';
+import 'package:test_new_things/domain/usecases/update_expense.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/expense_form_fields.dart';
+import 'package:test_new_things/domain/models/expense.dart';
+import 'package:test_new_things/data/services/cloud_sync_service.dart';
+import 'package:test_new_things/data/services/connectivity_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   final Expense? expense;
@@ -19,19 +22,28 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
-  final _addExpense = AddExpense(
-    ExpenseRepositoryImpl(),
-    CloudSyncService(),
-  );
-  final _updateExpense = UpdateExpense(
-    ExpenseRepositoryImpl(),
-    CloudSyncService(),
-  );
+  late final AddExpense _addExpense;
+  late final UpdateExpense _updateExpense;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final repository = context.read<ExpenseRepository>();
+      final cloudSync = context.read<CloudSyncService>();
+      _addExpense = AddExpense(repository, cloudSync);
+      _updateExpense = UpdateExpense(repository, cloudSync);
+      _initialized = true;
+    }
+  }
   
   String _selectedCategory = 'Food';
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   late final bool _isEditing;
+  bool _isRecurring = false;
+  String _recurrenceInterval = 'monthly';
 
   final List<String> _categories = [
     'Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Health', 'Other'
@@ -56,6 +68,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         hour: expense.date.hour,
         minute: expense.date.minute,
       );
+      _isRecurring = expense.isRecurring;
+      _recurrenceInterval = expense.recurrenceInterval ?? 'monthly';
     }
   }
 
@@ -94,8 +108,15 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     }
   }
 
+  bool _isSaving = false;
+
   Future<void> _saveExpense() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+    });
 
     final dateTime = DateTime(
       _selectedDate.year,
@@ -111,6 +132,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       amount: double.parse(_amountController.text),
       date: dateTime,
       category: _selectedCategory,
+      isRecurring: _isRecurring,
+      recurrenceInterval: _isRecurring ? _recurrenceInterval : null,
+      lastProcessed: _isRecurring ? (widget.expense?.lastProcessed ?? DateTime.now()) : null,
     );
 
     try {
@@ -119,40 +143,51 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       } else {
         await _addExpense.call(expense);
       }
+
+      final hasInternet = await ConnectivityService.instance.hasInternetConnection();
       final isSignedIn = _isEditing
           ? await _updateExpense.cloudSync.isSignedIn()
           : await _addExpense.cloudSync.isSignedIn();
       
       if (mounted) {
-        Navigator.pop(context, true);
+        context.pop(true);
+
+        final String message;
+        if (isSignedIn && hasInternet) {
+          message = _isEditing
+              ? 'Expense updated and synced to cloud!'
+              : 'Expense added and synced to cloud!';
+        } else if (isSignedIn && !hasInternet) {
+          message = _isEditing
+              ? 'Expense updated locally. Will sync when online.'
+              : 'Expense added locally. Will sync when online.';
+        } else {
+          message = _isEditing
+              ? 'Expense updated successfully!'
+              : 'Expense added successfully!';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              _isEditing
-                  ? (isSignedIn
-                      ? 'Expense updated and synced to cloud!'
-                      : 'Expense updated successfully!')
-                  : (isSignedIn
-                      ? 'Expense added and synced to cloud!'
-                      : 'Expense added successfully!'),
-            ),
+            content: Text(message),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        final errorMessage = e.toString().contains('No internet connection')
-            ? 'No internet connection. Will sync when online.'
-            : 'Failed to sync to cloud. Will sync when online.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
+            content: Text('Failed to save expense: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
-        Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
       }
     }
   }
@@ -182,13 +217,33 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           selectedTime: _selectedTime,
           onSelectDate: _selectDate,
           onSelectTime: _selectTime,
+          isRecurring: _isRecurring,
+          recurrenceInterval: _recurrenceInterval,
+          onRecurringChanged: (value) {
+            setState(() {
+              _isRecurring = value;
+            });
+          },
+          onIntervalChanged: (value) {
+            setState(() {
+              _recurrenceInterval = value;
+            });
+          },
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _saveExpense,
-        backgroundColor: Colors.blue.shade700,
-        icon: const Icon(Icons.save),
-        label: Text(_isEditing ? 'Update Expense' : 'Save Expense'),
+        onPressed: _isSaving ? null : _saveExpense,
+        backgroundColor: _isSaving ? Colors.grey : Colors.blue.shade700,
+        icon: _isSaving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Icon(Icons.save),
+        label: Text(_isSaving
+            ? 'Saving...'
+            : (_isEditing ? 'Update Expense' : 'Save Expense')),
       ),
     );
   }

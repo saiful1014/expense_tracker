@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'expense_statistics_card.dart';
+import 'package:test_new_things/ui/features/expenses/views/widgets/expense_statistics_card.dart';
+import 'package:test_new_things/ui/core/theme/app_theme.dart';
 
 class ExpenseStatisticsSection extends StatelessWidget {
   final double totalExpenses;
@@ -15,20 +16,26 @@ class ExpenseStatisticsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryGradient = AppTheme.getPrimaryGradient(isDark);
+    final accentGradient = AppTheme.getAccentGradient(isDark);
+
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 8),
       child: Row(
         children: [
           ExpenseStatisticsCard(
-            label: 'Total',
+            label: 'Total Spends',
             amount: totalExpenses,
-            gradientColors: [Colors.blue.shade700, Colors.blue.shade500],
+            gradientColors: primaryGradient,
+            icon: Icons.account_balance_wallet_outlined,
           ),
           const SizedBox(width: 12),
           ExpenseStatisticsCard(
             label: todayOrRangeLabel,
             amount: todayOrRangeExpenses,
-            gradientColors: [Colors.green.shade600, Colors.green.shade400],
+            gradientColors: accentGradient,
+            icon: Icons.today_outlined,
           ),
         ],
       ),
