@@ -67,7 +67,10 @@ class ExpenseFormFields extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            initialValue: selectedCategory,
+            key: ValueKey('$selectedCategory-${categories.length}'),
+            initialValue: categories.contains(selectedCategory)
+                ? selectedCategory
+                : (categories.isNotEmpty ? categories.first : null),
             decoration: const InputDecoration(
               labelText: 'Category',
               prefixIcon: Icon(Icons.category_outlined),
@@ -78,7 +81,9 @@ class ExpenseFormFields extends StatelessWidget {
                 child: Text(category),
               );
             }).toList(),
-            onChanged: (value) => onCategoryChanged(value!),
+            onChanged: (value) {
+              if (value != null) onCategoryChanged(value);
+            },
           ),
           const SizedBox(height: 16),
           Row(

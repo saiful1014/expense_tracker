@@ -7,6 +7,8 @@ import 'package:test_new_things/domain/usecases/delete_expense.dart';
 import 'package:test_new_things/domain/usecases/process_recurring_expenses.dart';
 import 'package:test_new_things/data/services/cloud_sync_service.dart';
 import 'package:test_new_things/data/services/database_helper.dart';
+import 'package:intl/intl.dart';
+import 'package:test_new_things/ui/core/utils/expense_utils.dart';
 
 enum SyncStatus {
   synced,
@@ -40,12 +42,22 @@ class ExpenseViewModel extends ChangeNotifier {
   DateTime? _endDate;
   String? _errorMessage;
 
+  // Month Navigation State
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+
   // Premium Features State
   double _budgetLimit = 0.0;
   String _searchQuery = '';
   String _selectedCategory = 'All';
   double? _minAmount;
   double? _maxAmount;
+
+  // Custom Categories State
+  List<String> _customCategories = [];
+
+  static const List<String> _builtInCategories = [
+    'Food', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Health', 'Others',
+  ];
 
   SyncStatus _syncStatus = SyncStatus.synced;
   int _unsyncedCount = 0;
@@ -64,6 +76,20 @@ class ExpenseViewModel extends ChangeNotifier {
   String get selectedCategory => _selectedCategory;
   double? get minAmount => _minAmount;
   double? get maxAmount => _maxAmount;
+
+  // Month Navigation Getters
+  DateTime get selectedMonth => _selectedMonth;
+  String get selectedMonthLabel => DateFormat('MMMM yyyy').format(_selectedMonth);
+  bool get canGoToNextMonth {
+    final now = DateTime.now();
+    return _selectedMonth.year < now.year ||
+        (_selectedMonth.year == now.year && _selectedMonth.month < now.month);
+  }
+
+  // Category Getters
+  List<String> get customCategories => _customCategories;
+  List<String> get allCategories => ['All', ..._builtInCategories, ..._customCategories];
+  List<String> get selectableCategories => [..._builtInCategories, ..._customCategories];
 
   SyncStatus get syncStatus => _syncStatus;
   int get unsyncedCount => _unsyncedCount;
@@ -119,7 +145,7 @@ class ExpenseViewModel extends ChangeNotifier {
   // Insights Calculations
   Map<String, double> getCategoryBreakdown() {
     final Map<String, double> breakdown = {};
-    for (final expense in filteredExpenses) {
+    for (final expense in _expenses) {
       breakdown[expense.category] = (breakdown[expense.category] ?? 0.0) + expense.amount;
     }
     return breakdown;
@@ -163,8 +189,21 @@ class ExpenseViewModel extends ChangeNotifier {
   }
 
   Future<void> _loadLocalData() async {
-    final expensesList = await getExpenses(startDate: _startDate, endDate: _endDate);
-    final total = await repository.getTotalExpenses();
+    // Default to selected month when no custom date range is active
+    final DateTime effectiveStart;
+    final DateTime effectiveEnd;
+
+    if (_startDate != null && _endDate != null) {
+      effectiveStart = _startDate!;
+      effectiveEnd = _endDate!;
+    } else {
+      effectiveStart = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final nextMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+      effectiveEnd = nextMonth.subtract(const Duration(days: 1));
+    }
+
+    final expensesList = await getExpenses(startDate: effectiveStart, endDate: effectiveEnd);
+    final total = await repository.getTotalExpensesByDateRange(effectiveStart, effectiveEnd);
     final today = await repository.getTotalExpensesByDate(DateTime.now());
     
     double selectedTotal = 0.0;
@@ -190,6 +229,7 @@ class ExpenseViewModel extends ChangeNotifier {
       _budgetLimit = prefs.getDouble('budget_limit') ?? 0.0;
 
       await processRecurringExpenses();
+      await loadCustomCategories();
       await _loadLocalData();
 
       final hasUser = cloudSync.userId != null;
@@ -235,5 +275,47 @@ class ExpenseViewModel extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  // Month Navigation Methods
+  void goToPreviousMonth() {
+    _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+    loadExpenses();
+  }
+
+  void goToNextMonth() {
+    if (!canGoToNextMonth) return;
+    _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+    loadExpenses();
+  }
+
+  // Custom Category Methods
+  Future<void> loadCustomCategories() async {
+    _customCategories = await DatabaseHelper.instance.getAllCustomCategories();
+    ExpenseUtils.setCustomCategories(_customCategories);
+    notifyListeners();
+  }
+
+  Future<void> addCustomCategory(String name) async {
+    await DatabaseHelper.instance.insertCustomCategory(name);
+    await loadCustomCategories();
+  }
+
+  Future<void> updateCustomCategory(int id, String oldName, String newName) async {
+    await DatabaseHelper.instance.updateCustomCategory(id, newName);
+    await DatabaseHelper.instance.updateExpenseCategory(oldName, newName);
+    await loadCustomCategories();
+    await _loadLocalData();
+  }
+
+  Future<void> deleteCustomCategory(int id, String name) async {
+    await DatabaseHelper.instance.resetExpenseCategory(name);
+    await DatabaseHelper.instance.deleteCustomCategory(id);
+    await loadCustomCategories();
+    await _loadLocalData();
+  }
+
+  Future<List<Map<String, dynamic>>> getCustomCategoriesWithId() async {
+    return await DatabaseHelper.instance.getAllCustomCategoriesWithId();
   }
 }

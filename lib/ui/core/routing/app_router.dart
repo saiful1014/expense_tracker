@@ -6,6 +6,7 @@ import 'package:test_new_things/ui/features/borrow_lend/views/deferred_borrow_le
 import 'package:test_new_things/ui/features/borrow_lend/views/add_borrow_lend_screen.dart';
 import 'package:test_new_things/ui/features/sync/views/sync_setup_screen.dart';
 import 'package:test_new_things/ui/features/insights/views/insights_screen.dart';
+import 'package:test_new_things/ui/features/expenses/views/manage_categories_screen.dart';
 import 'package:test_new_things/domain/models/expense.dart';
 import 'package:test_new_things/domain/models/borrow_lend.dart';
 
@@ -46,6 +47,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/insights',
       builder: (context, state) => const InsightsScreen(),
+    ),
+    GoRoute(
+      path: '/manage-categories',
+      builder: (context, state) => const ManageCategoriesScreen(),
     ),
   ],
 );

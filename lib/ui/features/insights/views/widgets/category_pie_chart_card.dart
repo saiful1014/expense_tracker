@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:test_new_things/ui/core/theme/app_theme.dart';
+import 'package:test_new_things/ui/core/utils/expense_utils.dart';
 
 class CategoryPieChartCard extends StatelessWidget {
   final Map<String, double> categoryData;
@@ -16,7 +17,7 @@ class CategoryPieChartCard extends StatelessWidget {
     final sortedEntries = categoryData.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    final chartColors = sortedEntries.map((e) => AppTheme.getCategoryColor(e.key)).toList();
+    final chartColors = sortedEntries.map((e) => ExpenseUtils.getCategoryColor(e.key)).toList();
 
     return Card(
       child: Padding(
@@ -72,14 +73,19 @@ class CategoryPieChartCard extends StatelessWidget {
                   child: Row(
                     children: [
                       Container(
-                        width: 12,
-                        height: 12,
+                        width: 32,
+                        height: 32,
                         decoration: BoxDecoration(
-                          color: color,
+                          color: color.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
+                        child: Icon(
+                          ExpenseUtils.getCategoryIcon(entry.key),
+                          size: 16,
+                          color: color,
+                        ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           entry.key,
@@ -135,7 +141,12 @@ class _DonutChartPainter extends CustomPainter {
     double startAngle = -pi / 2;
 
     for (int i = 0; i < data.length; i++) {
+      if (data[i] <= 0) continue;
       final sweepAngle = (data[i] / total) * 2 * pi;
+      if (sweepAngle <= 0.06) {
+        startAngle += sweepAngle;
+        continue;
+      }
       final paint = Paint()
         ..color = colors[i % colors.length]
         ..style = PaintingStyle.stroke

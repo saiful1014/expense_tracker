@@ -22,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 7, // Updated version for due date & recurrence
+      version: 8, // Updated version for custom categories
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -44,6 +44,12 @@ class DatabaseHelper {
     ''');
     await db.execute('CREATE INDEX idx_expenses_date ON expenses(date)');
     await db.execute('CREATE INDEX idx_expenses_synced ON expenses(synced)');
+    await db.execute('''
+      CREATE TABLE custom_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE
+      )
+    ''');
     await db.execute('''
       CREATE TABLE borrow_lend (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -140,6 +146,16 @@ class DatabaseHelper {
       } catch (_) {}
       try {
         await db.execute("ALTER TABLE borrow_lend ADD COLUMN due_date TEXT");
+      } catch (_) {}
+    }
+    if (oldVersion < 8) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS custom_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+          )
+        ''');
       } catch (_) {}
     }
   }
@@ -446,10 +462,69 @@ class DatabaseHelper {
     );
   }
 
+  // Custom Categories CRUD
+  Future<int> insertCustomCategory(String name) async {
+    final db = await database;
+    return await db.insert('custom_categories', {'name': name.trim()});
+  }
+
+  Future<List<String>> getAllCustomCategories() async {
+    final db = await database;
+    final result = await db.query('custom_categories', orderBy: 'name ASC');
+    return result.map((map) => map['name'] as String).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getAllCustomCategoriesWithId() async {
+    final db = await database;
+    return await db.query('custom_categories', orderBy: 'name ASC');
+  }
+
+  Future<int> updateCustomCategory(int id, String newName) async {
+    final db = await database;
+    return await db.update(
+      'custom_categories',
+      {'name': newName.trim()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deleteCustomCategory(int id) async {
+    final db = await database;
+    return await db.delete(
+      'custom_categories',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Bulk rename all expenses from [oldName] to [newName] category.
+  Future<int> updateExpenseCategory(String oldName, String newName) async {
+    final db = await database;
+    return await db.update(
+      'expenses',
+      {'category': newName.trim(), 'synced': 0},
+      where: 'category = ?',
+      whereArgs: [oldName],
+    );
+  }
+
+  /// Reset all expenses with [categoryName] to 'Others'.
+  Future<int> resetExpenseCategory(String categoryName) async {
+    final db = await database;
+    return await db.update(
+      'expenses',
+      {'category': 'Others', 'synced': 0},
+      where: 'category = ?',
+      whereArgs: [categoryName],
+    );
+  }
+
   Future<void> clearDatabase() async {
     final db = await database;
     await db.delete('expenses');
     await db.delete('borrow_lend');
+    await db.delete('custom_categories');
   }
 
   Future<void> close() async {

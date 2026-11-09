@@ -7,8 +7,23 @@ import 'package:test_new_things/ui/features/insights/views/widgets/monthly_bar_c
 import 'package:test_new_things/ui/core/utils/pdf_generator.dart';
 import 'package:test_new_things/ui/core/theme/app_theme.dart';
 
-class InsightsScreen extends StatelessWidget {
+class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key});
+
+  @override
+  State<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends State<InsightsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<ExpenseViewModel>().loadExpenses();
+      }
+    });
+  }
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
@@ -76,7 +91,7 @@ class InsightsScreen extends StatelessWidget {
                   } else {
                     try {
                       await PdfGenerator.generateAndShareExpenseReport(
-                        expenses: viewModel.filteredExpenses,
+                        expenses: viewModel.expenses,
                         startDate: viewModel.startDate!,
                         endDate: viewModel.endDate!,
                       );
@@ -141,6 +156,34 @@ class InsightsScreen extends StatelessWidget {
                             fontSize: 12,
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        tooltip: 'Previous month',
+                        onPressed: () => viewModel.goToPreviousMonth(),
+                      ),
+                      Text(
+                        viewModel.selectedMonthLabel,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        tooltip: 'Next month',
+                        onPressed: viewModel.canGoToNextMonth
+                            ? () => viewModel.goToNextMonth()
+                            : null,
                       ),
                     ],
                   ),

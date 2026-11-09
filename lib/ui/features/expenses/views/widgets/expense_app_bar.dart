@@ -13,6 +13,7 @@ class ExpenseAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onBorrowLend;
   final VoidCallback onDateRange;
   final VoidCallback onInsights;
+  final VoidCallback onManageCategories;
   final VoidCallback? onClearFilter;
 
   const ExpenseAppBar({
@@ -26,6 +27,7 @@ class ExpenseAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onBorrowLend,
     required this.onDateRange,
     required this.onInsights,
+    required this.onManageCategories,
     this.onClearFilter,
   });
 
@@ -141,6 +143,11 @@ class ExpenseAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: const Icon(Icons.date_range_outlined),
           tooltip: 'Filter by date range',
           onPressed: onDateRange,
+        ),
+        IconButton(
+          icon: const Icon(Icons.category_outlined),
+          tooltip: 'Manage Categories',
+          onPressed: onManageCategories,
         ),
         if (onClearFilter != null)
           IconButton(

@@ -225,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<ExpenseViewModel>(
       builder: (context, controller, child) {
-        final categories = ['All', 'Food', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Others'];
+        final categories = controller.allCategories;
 
           return Scaffold(
             appBar: ExpenseAppBar(
@@ -241,6 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               onDateRange: _selectDateRange,
               onInsights: () => context.push('/insights'),
+              onManageCategories: () async {
+                await context.push('/manage-categories');
+              },
               onClearFilter: controller.startDate != null && controller.endDate != null
                   ? () => controller.clearDateFilter()
                   : null,
@@ -276,6 +279,34 @@ class _HomeScreenState extends State<HomeScreen> {
                             BudgetCard(
                               controller: controller,
                               onEdit: () => _showBudgetDialog(context, controller),
+                            ),
+                            // Month Navigation Row
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.chevron_left),
+                                    tooltip: 'Previous month',
+                                    onPressed: () => controller.goToPreviousMonth(),
+                                  ),
+                                  Text(
+                                    controller.selectedMonthLabel,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.chevron_right),
+                                    tooltip: 'Next month',
+                                    onPressed: controller.canGoToNextMonth
+                                        ? () => controller.goToNextMonth()
+                                        : null,
+                                  ),
+                                ],
+                              ),
                             ),
                             OverdueWarningBanner(
                               count: _overdueTransactions.length,

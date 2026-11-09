@@ -8,6 +8,7 @@ import 'package:test_new_things/ui/features/expenses/views/widgets/expense_form_
 import 'package:test_new_things/domain/models/expense.dart';
 import 'package:test_new_things/data/services/cloud_sync_service.dart';
 import 'package:test_new_things/data/services/connectivity_service.dart';
+import 'package:test_new_things/ui/features/expenses/view_models/expense_view_model.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   final Expense? expense;
@@ -32,8 +33,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     if (!_initialized) {
       final repository = context.read<ExpenseRepository>();
       final cloudSync = context.read<CloudSyncService>();
+      final controller = context.read<ExpenseViewModel>();
       _addExpense = AddExpense(repository, cloudSync);
       _updateExpense = UpdateExpense(repository, cloudSync);
+      _categories = controller.selectableCategories;
       _initialized = true;
     }
   }
@@ -45,8 +48,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   bool _isRecurring = false;
   String _recurrenceInterval = 'monthly';
 
-  final List<String> _categories = [
-    'Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Health', 'Other'
+  List<String> _categories = [
+    'Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Health', 'Others'
   ];
 
   @override
@@ -70,6 +73,25 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       );
       _isRecurring = expense.isRecurring;
       _recurrenceInterval = expense.recurrenceInterval ?? 'monthly';
+    }
+
+    // Load dynamic categories from view model
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadCategories();
+    });
+  }
+
+  Future<void> _loadCategories() async {
+    final controller = context.read<ExpenseViewModel>();
+    await controller.loadCustomCategories();
+    if (mounted) {
+      setState(() {
+        _categories = controller.selectableCategories;
+        // If editing and the category doesn't exist in the list, fallback to 'Others'
+        if (_isEditing && !_categories.contains(_selectedCategory)) {
+          _selectedCategory = 'Others';
+        }
+      });
     }
   }
 
